@@ -30,14 +30,6 @@ class _EstudiantePageState extends State<EstudiantePage> {
     cargarEstudiantes();
   }
 
-  void cargarEstudiantes() async {
-    final lista = await _service.obtenerEstudiantes();
-    setState(() {
-      estudiantes = lista;
-      paginaActual = 1;
-    });
-  }
-
   void limpiarFormulario() {
     carnetCtrl.clear();
     nombreCtrl.clear();
@@ -48,6 +40,20 @@ class _EstudiantePageState extends State<EstudiantePage> {
       estudianteEditando = null;
     });
   }
+
+  void cargarEstudiantes() async {
+  try {
+    final lista = await _service.obtenerEstudiantes();
+    setState(() {
+      estudiantes = lista;
+      paginaActual = 1;
+    });
+  } catch (e) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      mostrarMensajeError('Error al cargar estudiantes');
+    });
+  }
+}
 
   void guardar() async {
     if (!_formKey.currentState!.validate()) return;
@@ -62,32 +68,61 @@ class _EstudiantePageState extends State<EstudiantePage> {
     );
 
     if (estudianteEditando != null) {
-      final confirmado = await confirmarDialogo('Confirmar actualización',
-          '¿Estás seguro de que querés actualizar este estudiante?');
+      final confirmado = await confirmarDialogo(
+        'Confirmar actualización',
+        '¿Estás seguro de que quieres actualizar este estudiante?',
+      );
       if (!confirmado) return;
     }
 
-    final ok = estudianteEditando == null
-        ? await _service.registrarEstudiante(nuevo)
-        : await _service.actualizarEstudiante(nuevo);
+    try {
+      final ok = estudianteEditando == null
+          ? await _service.registrarEstudiante(nuevo)
+          : await _service.actualizarEstudiante(nuevo);
 
-    if (ok) {
-      limpiarFormulario();
-      cargarEstudiantes();
-      mostrarMensaje(estudianteEditando == null
-          ? 'Estudiante agregado'
-          : 'Estudiante actualizado');
+      if (ok) {
+        limpiarFormulario();
+        cargarEstudiantes();
+        mostrarMensaje(
+          estudianteEditando == null
+              ? 'Estudiante agregado'
+              : 'Estudiante actualizado',
+        );
+      } else {
+        if(estudianteEditando==null){
+          mostrarMensajeError('No se pudo guardar el estudiante');
+        }else{
+          mostrarMensajeError('No se pudo actualizar el estudiante');
+        }
+        
+      }
+    } catch (e) {
+      if(estudianteEditando==null){
+          mostrarMensajeError('Error al guardar el estudiante');
+        }else{
+          mostrarMensajeError('Error al actualizar el estudiante');
+        }
     }
   }
 
   void eliminar(int id) async {
     final confirmado = await confirmarDialogo(
-        'Confirmar eliminación', '¿Estás seguro de que querés eliminar este estudiante?');
+      'Confirmar eliminación',
+      '¿Estás seguro de que querés eliminar este estudiante?',
+    );
     if (!confirmado) return;
 
-    await _service.eliminarEstudiante(id);
-    cargarEstudiantes();
-    mostrarMensaje('Estudiante eliminado con éxito');
+    try {
+      final ok = await _service.eliminarEstudiante(id);
+      if (ok) {
+        cargarEstudiantes();
+        mostrarMensaje('Estudiante eliminado con éxito');
+      } else {
+        mostrarMensajeError('No se pudo eliminar el estudiante');
+      }
+    } catch (e) {
+      mostrarMensajeError('Error al eliminar: $e');
+    }
   }
 
   Future<bool> confirmarDialogo(String titulo, String mensaje) async {
@@ -97,8 +132,14 @@ class _EstudiantePageState extends State<EstudiantePage> {
             title: Text(titulo),
             content: Text(mensaje),
             actions: [
-              TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancelar')),
-              ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirmar')),
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Confirmar'),
+              ),
             ],
           ),
         )) ??
@@ -106,19 +147,32 @@ class _EstudiantePageState extends State<EstudiantePage> {
   }
 
   void mostrarMensaje(String texto) {
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(
-      content: Row(
-        children: [
-          const Icon(Icons.check_circle, color: Colors.white),
-          const SizedBox(width: 10),
-          Text(texto),
-        ],
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.check_circle, color: Colors.white),
+            const SizedBox(width: 10),
+            Text(texto),
+          ],
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 
+  void mostrarMensajeError(String texto) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            const Icon(Icons.error, color: Colors.red),
+            const SizedBox(width: 10),
+            Text(texto),
+          ],
+        ),
+      ),
+    );
+  }
 
   void cargarParaEditar(Estudiante est) {
     setState(() {
@@ -134,7 +188,10 @@ class _EstudiantePageState extends State<EstudiantePage> {
   List<Estudiante> obtenerPaginaActual() {
     final inicio = (paginaActual - 1) * estudiantesPorPagina;
     final fin = inicio + estudiantesPorPagina;
-    return estudiantes.sublist(inicio, fin > estudiantes.length ? estudiantes.length : fin);
+    return estudiantes.sublist(
+      inicio,
+      fin > estudiantes.length ? estudiantes.length : fin,
+    );
   }
 
   void siguientePagina() {
@@ -160,8 +217,10 @@ class _EstudiantePageState extends State<EstudiantePage> {
           children: [
             _formularioEstudiante(),
             const SizedBox(height: 32),
-            const Text('Lista de Estudiantes',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            const Text(
+              'Lista de Estudiantes',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 16),
             Column(
               children: [
@@ -179,13 +238,15 @@ class _EstudiantePageState extends State<EstudiantePage> {
                       Text('Página $paginaActual'),
                       const SizedBox(width: 16),
                       ElevatedButton(
-                        onPressed: (paginaActual * estudiantesPorPagina) < estudiantes.length
+                        onPressed:
+                            (paginaActual * estudiantesPorPagina) <
+                                estudiantes.length
                             ? siguientePagina
                             : null,
                         child: const Text('Siguiente'),
                       ),
                     ],
-                  )
+                  ),
               ],
             ),
           ],
@@ -205,8 +266,10 @@ class _EstudiantePageState extends State<EstudiantePage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Formulario de Estudiante',
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              const Text(
+                'Formulario de Estudiante',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 16),
               Row(
                 children: [
@@ -226,10 +289,15 @@ class _EstudiantePageState extends State<EstudiantePage> {
                   const SizedBox(width: 16),
                   ElevatedButton(
                     onPressed: guardar,
-                    child: Text(estudianteEditando == null ? 'Agregar' : 'Actualizar'),
+                    child: Text(
+                      estudianteEditando == null ? 'Agregar' : 'Actualizar',
+                    ),
                   ),
                   if (estudianteEditando != null)
-                    TextButton(onPressed: limpiarFormulario, child: const Text('Cancelar')),
+                    TextButton(
+                      onPressed: limpiarFormulario,
+                      child: const Text('Cancelar'),
+                    ),
                 ],
               ),
             ],
@@ -264,7 +332,9 @@ class _EstudiantePageState extends State<EstudiantePage> {
   Widget _tarjetaEstudiante(Estudiante e) {
     final isEditando = e.idEstudiante == estudianteEditando?.idEstudiante;
     return Card(
-      color: isEditando ? const Color.fromARGB(255, 90, 176, 238) : Colors.white,
+      color: isEditando
+          ? const Color.fromARGB(255, 90, 176, 238)
+          : Colors.white,
       elevation: 5,
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(
@@ -277,8 +347,10 @@ class _EstudiantePageState extends State<EstudiantePage> {
           backgroundColor: Color(0xFF234563),
           child: Icon(Icons.person, color: Colors.white),
         ),
-        title: Text('${e.nombre} ${e.apellido}',
-            style: const TextStyle(fontWeight: FontWeight.bold)),
+        title: Text(
+          '${e.nombre} ${e.apellido}',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
         subtitle: Text(
           'Carnet: ${e.carnet}\nCorreo: ${e.correoElectronico ?? "-"}\nTel: ${e.telefono ?? "-"}',
         ),
